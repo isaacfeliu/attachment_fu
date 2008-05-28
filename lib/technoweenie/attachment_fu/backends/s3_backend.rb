@@ -122,7 +122,7 @@ module Technoweenie # :nodoc:
         class ConfigFileNotFoundError < StandardError; end
 
         def self.included(base) #:nodoc:
-          mattr_reader :bucket_name, :s3_config
+          mattr_reader :s3_config
           
           begin
             require 'aws/s3'
@@ -138,9 +138,14 @@ module Technoweenie # :nodoc:
           #  raise ConfigFileNotFoundError.new('File %s not found' % @@s3_config_path)
           end
 
-          @@bucket_name = s3_config[:bucket_name]
-
-          Base.establish_connection!(s3_config.slice(:access_key_id, :secret_access_key, :server, :port, :use_ssl, :persistent, :proxy))
+          Base.establish_connection!(s3_config.slice(:access_key_id, :secret_access_key, :port, :use_ssl, :persistent, :proxy))
+          
+          [s3_config[:buckets].split(" ")].flatten.each do |bucket_name|
+            RAILS_DEFAULT_LOGGER.debug "Initialized S3 Bucket #{bucket_name} => #{bucket_name.gsub('.','_').camelize}"
+            Object.const_set("#{bucket_name.gsub('.','_').camelize}", Class.new(AWS::S3::S3Object))
+            bucket_name.gsub('.','_').camelize.constantize.establish_connection!(:server => "#{bucket_name}.#{AWS::S3::DEFAULT_HOST}")
+          end
+          
 
           # Bucket.create(@@bucket_name)
 
@@ -155,6 +160,10 @@ module Technoweenie # :nodoc:
           @hostname ||= s3_config[:server] || AWS::S3::DEFAULT_HOST
         end
         
+        def self.use_vhosts?
+          @use_vhosts ||= s3_config[:use_vhosts] || false
+        end
+        
         def self.port_string
           @port_string ||= (s3_config[:port].nil? || s3_config[:port] == (s3_config[:use_ssl] ? 443 : 80)) ? '' : ":#{s3_config[:port]}"
         end
@@ -166,6 +175,10 @@ module Technoweenie # :nodoc:
           
           def s3_hostname
             Technoweenie::AttachmentFu::Backends::S3Backend.hostname
+          end
+          
+          def s3_use_vhosts?
+            Technoweenie::AttachmentFu::Backends::S3Backend.use_vhosts?
           end
           
           def s3_port_string
@@ -189,6 +202,10 @@ module Technoweenie # :nodoc:
         def base_path
           File.join(attachment_options[:path_prefix], attachment_path_id)
         end
+        
+        def bucket_object
+          bucket_name.gsub('.','_').camelize.constantize
+        end
 
         # The full path to the file relative to the bucket name
         # Example: <tt>:table_name/:id/:filename</tt>
@@ -207,7 +224,11 @@ module Technoweenie # :nodoc:
         #
         # The optional thumbnail argument will output the thumbnail's filename (if any).
         def s3_url(thumbnail = nil)
-          File.join(s3_protocol + s3_hostname + s3_port_string, bucket_name, full_filename(thumbnail))
+          if s3_use_vhosts?
+            File.join(s3_protocol + bucket_name + s3_port_string, full_filename(thumbnail))
+          else
+            File.join(s3_protocol + bucket_name + "." + s3_hostname + s3_port_string, full_filename(thumbnail))
+          end
         end
         alias :public_filename :s3_url
 
@@ -256,6 +277,10 @@ module Technoweenie # :nodoc:
         def s3_hostname
           Technoweenie::AttachmentFu::Backends::S3Backend.hostname
         end
+        
+        def s3_use_vhosts?
+          Technoweenie::AttachmentFu::Backends::S3Backend.use_vhosts?
+        end
           
         def s3_port_string
           Technoweenie::AttachmentFu::Backends::S3Backend.port_string
@@ -264,7 +289,7 @@ module Technoweenie # :nodoc:
         protected
           # Called in the after_destroy callback
           def destroy_file
-            S3Object.delete full_filename, bucket_name
+            bucket_object.delete full_filename, bucket_name
           end
 
           def rename_file
@@ -272,7 +297,7 @@ module Technoweenie # :nodoc:
             
             old_full_filename = File.join(base_path, @old_filename)
 
-            S3Object.rename(
+            bucket_object.rename(
               old_full_filename,
               full_filename,
               bucket_name,
@@ -285,7 +310,7 @@ module Technoweenie # :nodoc:
 
           def save_to_storage
             if save_attachment?
-              S3Object.store(
+              bucket_object.store(
                 full_filename,
                 (temp_path ? File.open(temp_path) : temp_data),
                 bucket_name,

@@ -80,6 +80,7 @@ Fields for attachment_fu metadata tables...
     size,         :integer  # file size in bytes
     content_type, :string   # mime type, ex: application/mp3
     filename,     :string   # sanitized filename
+    bucket_name   :string   # Amazon's S3 Bucket name
   that reference images:
     height,       :integer  # in pixels
     width,        :integer  # in pixels

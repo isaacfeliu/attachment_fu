@@ -1,14 +1,17 @@
 development:
-  bucket_name: appname_development
+  buckets: assets.development.example.com assets.development.example.es
+  use_vhosts: true
   access_key_id: 
   secret_access_key: 
 
 test:
-  bucket_name: appname_test
+  buckets: assets.test.example.com assets.test.example.es
+  use_vhosts: true
   access_key_id: 
   secret_access_key: 
 
 production:
-  bucket_name: appname
+  buckets: assets.example.com assets.example.es
+  use_vhosts: true
   access_key_id: 
   secret_access_key: 
