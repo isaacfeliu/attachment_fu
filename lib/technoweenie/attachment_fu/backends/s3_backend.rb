@@ -174,8 +174,10 @@ module Technoweenie # :nodoc:
           
           [s3_config[:buckets].split(" ")].flatten.each do |bucket_name|
             RAILS_DEFAULT_LOGGER.debug "Initialized S3 Bucket #{bucket_name} => #{bucket_name.gsub('.','_').camelize}"
-            Object.const_set("#{bucket_name.gsub('.','_').camelize}", Class.new(AWS::S3::S3Object))
-            bucket_name.gsub('.','_').camelize.constantize.establish_connection!(:server => "#{bucket_name}.#{AWS::S3::DEFAULT_HOST}")
+            unless Object.const_defined?("#{bucket_name.gsub('.','_').camelize}")
+              Object.const_set("#{bucket_name.gsub('.','_').camelize}", Class.new(AWS::S3::S3Object))
+              bucket_name.gsub('.','_').camelize.constantize.establish_connection!(:server => "#{bucket_name}.#{AWS::S3::DEFAULT_HOST}")
+            end
           end
           
           base.before_update :rename_file
