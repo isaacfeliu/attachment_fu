@@ -47,9 +47,9 @@ module Technoweenie # :nodoc:
             img.crop_resized!(dimensions[0].to_i, dimensions[1].to_i)
           elsif size.is_a?(String) && size =~ /^r.*$/ # Image round-cropping - example geometry string: r120x60
             dimensions = size[1..size.size].split("x")
-            if img.columns > img.rows
+            if img.columns > img.rows && (img.columns > dimensions[0].to_i || img.rows > dimensions[1].to_i)
               img.crop_resized!(dimensions[0].to_i, dimensions[1].to_i)
-            else
+            elsif img.rows > dimensions[0].to_i || img.columns > dimensions[1].to_i
               img.crop_resized!(dimensions[1].to_i, dimensions[0].to_i)
             end
           else
